@@ -1,11 +1,13 @@
 # Intro
 
+This is an environment file and value parsing piece of npm package. It aims to replace dotenv for me and anyone eager and brave enough to use it. It supports many features I missed.
+
 The default export of this module is a function named env that takes an object with **either** `file` or `content` as field, where `file` must be a path and `content` must be **either** an utf8 `Buffer` or a `string`. 
 
 I build this, because dotenv does not support following:
 ```bash
-TEST1=driew evol tcelloc I
-TEST2=I collect love weird $TEST1
+TEST1=sgnirts driew tcelloc I
+TEST2=I collect weird strings $TEST1
 ```
 
 Or following:
@@ -58,16 +60,17 @@ console.log(`I want following value: ${process.env("IWANTTHISVAR")}`);
 Or
 ```ts
 /**
- * .env content is:
+ * .env.bootstrap content is:
  * HOME=$HOME$USERPROFILE
  * LOCAL_NOT_FOUND_ERROR=".env.local was not found
  * Please create $HOME/.env.local!"
  */
 const {env} = require("x3-env");
-const {existsSync} = require("fs");
-const {join} = require("path");
-env({file: join(__dirname, ".env.bootstrap")});
-existsSync(join(process.env["HOME"], ".env")) 
-	&& env({file:join(process.env["HOME"], ".env")}) 
-	|| throw new Error(proces.env["LOCAL_NOT_FOUND_ERROR"]);
+const { existsSync } = require("fs");
+const { join } = require("path");
+env({ file: join(__dirname, ".env.bootstrap") });
+if (existsSync(join(process.env["HOME"], ".env")))
+	env({ file: join(process.env["HOME"], ".env") })
+else
+	throw new Error(process.env["LOCAL_NOT_FOUND_ERROR"]);
 ```
