@@ -4,5 +4,3 @@
 coverage/
 src/
 tsconfig.json
-test.ts
-tsconfig.json

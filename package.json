@@ -9,8 +9,8 @@
   "author": "x3cion",
   "main": "dist/parser.js",
   "scripts": {
-    "test": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"commonjs\\\"} nyc mocha -r ts-node/register -r source-map-support/register --recursive src/**/*.spec.ts --delay",
-    "prepublishOnly": "rm -rf dist/ && tsc",
+    "test": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"commonjs\\\"} nyc mocha -r ts-node/register -r source-map-support/register --recursive src/**/*.spec.ts",
+    "prepublishOnly": "rm -rf dist/ && tsc && npm run test",
     "watch": "tsc -w"
   },
   "typings": "dist/parser.d.ts",

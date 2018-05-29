@@ -1,15 +1,15 @@
-import { Transform, Writable } from "stream";
+import { Transform, Writable, Readable } from "stream";
 import { StringDecoder, NodeStringDecoder } from "string_decoder";
 import { createReadStream } from "fs";
+import { EOL } from "os";
 
 export class X3EnvParser extends Transform {
 	static KEY_FIRST_CHAR_REGEX = /[a-zA-Z_]/;
 	static KEY_TAIL_CHAR_REGEX = /[\w]/;
-	static VALUE_ALLOWED_NOQUOTE = /[^\n]/;
-	static VALUE_ALLOWED_QUOTE = /(.|\n)/;
+	static LINE_ENDING = new RegExp(`[^${EOL}]`);
 	static SPACE = /\s/;
 	static QUOTE = /['"]/;
-	static STRING_VARIABLE = /\$[a-zA-Z_][\w]*/g;
+	static STRING_VARIABLE = /\$([a-zA-Z_][\w]*)/g;
 
 	constructor() {
 		super({ readableObjectMode: true });
@@ -41,12 +41,8 @@ export class X3EnvParser extends Transform {
 		return (<RegExp>this.constructor["KEY_TAIL_CHAR_REGEX"]).test(char);
 	}
 
-	isValueInNoQuote(char: string): boolean {
-		return (<RegExp>this.constructor["VALUE_ALLOWED_NOQUOTE"]).test(char);
-	}
-
-	isValueInQuote(char: string): boolean {
-		return (<RegExp>this.constructor["VALUE_ALLOWED_QUOTE"]).test(char);
+	isLineEnding(char: string): boolean {
+		return (<RegExp>this.constructor["LINE_ENDING"]).test(char);
 	}
 
 	isSpace(char: string): boolean {
@@ -63,36 +59,17 @@ export class X3EnvParser extends Transform {
 
 	getParsedValue(): string {
 		if (!this.currentValue) return "";
-		let match = this.currentValue.match((<RegExp>this.constructor["STRING_VARIABLE"]));
-		if (match) {
-			match.shift();
-			match = match.sort((matchA, matchB) => matchA > matchB && -1 || matchA < matchB && 1 || 0);
-			let parts: any[] = [this.currentValue];
-			for (let i = 1, l = match.length; i < l; i++) {
-				const varUse = match[i];
-				const varName = varUse.substring(1);
-				const varValue = this.gatheredValues.has(varName) && this.gatheredValues.get(varName)
-					|| typeof process.env[varName] !== "undefined" && process.env[varName] || undefined;
-				if (typeof varValue === "undefined") continue;
-
-				parts = parts.reduce((newParts, v, index, arr) => {
-					if (typeof v === "string") {
-						let split: any[] = v.split(varUse);
-						for (let i = 0; i + 1 < split.length; i++) {
-							split.splice(++i, 0, { value: varValue });
-						}
-						newParts.push(...split);
-						return newParts;
-					}
-				}, []);
+		const output = this.currentValue.replace((<RegExp>this.constructor["STRING_VARIABLE"]), (match: string, varName: string) => {
+			let response = "";
+			if (this.gatheredValues.has(varName)) {
+				response = this.gatheredValues.get(varName);
+			} else if (typeof process.env[varName] !== "undefined") {
+				response = process.env[varName];
 			}
+			return response;
+		});
 
-			parts = parts.map(v => typeof v === "object" && v.value || v);
-
-			return parts.join("");
-		}
-
-		return this.currentValue;
+		return output;
 	}
 
 	pushEntry({ allowEmpty = false }: { allowEmpty?: boolean } = {}) {
@@ -103,19 +80,21 @@ export class X3EnvParser extends Transform {
 			throw new Error(`Key empty when trying to push entry @ ${this.getPosition()}`);
 		}
 
-		// this.gatheredValues.set(this.currentKey, this.currentQuote === '"' || !this.currentQuote ? this.getParsedValue() : this.currentValue);
+		const finalValue = (this.currentQuote === '"' || !this.currentQuote) ? this.getParsedValue() : this.currentValue
+		this.gatheredValues.set(this.currentKey, finalValue);
 
 		this.push({
 			key: this.currentKey,
-			value: this.currentQuote === '"' || !this.currentQuote ? this.getParsedValue() : this.currentValue
+			value: finalValue
 		});
 
 		this.currentKey = this.currentValue = "";
 		this.currentQuote = null;
+		this.inComment = this.inValue = this.lastWasEqualSign = this.lastWasEscape = false;
 	}
 
-	_transform(buff: Buffer, _: string, next: Function) {
-		this.currentContent += this.stringDecoder.write(buff);
+	workContent() {
+
 		for (let i = 0, l = this.currentContent.length; i < l; i++) {
 			const currentChar = this.currentContent[i];
 			if (currentChar === "\n") {
@@ -131,7 +110,16 @@ export class X3EnvParser extends Transform {
 			}
 
 			if (!this.inValue) {
-				if (currentChar === "=") {
+				if (this.lastWasEqualSign) {
+					if (this.isQuote(currentChar)) {
+						this.currentQuote = currentChar;
+					} else {
+						this.currentValue += currentChar;
+						this.lastWasEqualSign = false;
+					}
+					this.inValue = true;
+					continue;
+				} else if (currentChar === "=") {
 					this.lastWasEqualSign = true;
 					if (!this.currentKey) {
 						throw new Error(`No key gathered, but equal sign reached! @ ${this.getPosition()}`);
@@ -146,15 +134,6 @@ export class X3EnvParser extends Transform {
 				} else if (this.isKeyBeginning(currentChar) || this.currentKey && this.isKeyTail(currentChar)) {
 					this.currentKey += currentChar;
 					continue;
-				} else if (this.lastWasEqualSign) {
-					if (this.isQuote(currentChar)) {
-						this.currentQuote = currentChar;
-					} else {
-						this.currentValue += currentChar;
-						this.lastWasEqualSign = false;
-					}
-					this.inValue = true;
-					continue;
 				} else {
 					throw new Error(`Not in value and can't handle char (${currentChar}) @ ${this.getPosition()}`);
 				}
@@ -162,24 +141,49 @@ export class X3EnvParser extends Transform {
 				if (currentChar === "\\") {
 					this.lastWasEscape = true;
 					continue;
-				} else if ((this.currentQuote && currentChar === this.currentQuote && !this.lastWasEscape) || !this.currentQuote && currentChar === "\n") {
+				} else if ((this.currentQuote && currentChar === this.currentQuote && !this.lastWasEscape) || (!this.currentQuote && !this.isLineEnding(currentChar))) {
 					this.inValue = false;
 					this.pushEntry();
 					continue;
 				} else {
-					if (this.lastWasEscape) {
-						this.lastWasEscape = false;
-						this.currentValue += "\\";
-					}
+					this.lastWasEscape = false;
 					this.currentValue += currentChar;
 					continue;
 				}
 			}
 		}
+
+		this.currentContent = "";
+	}
+	_transform(buff: Buffer, _: string, next: Function) {
+		this.currentContent += this.stringDecoder.write(buff);
+		this.workContent();
+		next();
+	}
+
+	_flush(done) {
+		this.currentContent += this.stringDecoder.end();
+		this.pushEntry({ allowEmpty: true });
+		done();
 	}
 }
 
-export default function env(file: string): Promise<Map<string, string>> {
+export default function env({ file, content }: { file?: string, content?: string | Buffer }): Promise<Map<string, string>> {
+
+	let readable: Readable;
+	if (file) {
+		readable = createReadStream(file);
+	} else if (content) {
+		if (typeof content === "string") {
+			content = Buffer.from(content);
+		}
+		readable = new Readable({ read: () => { } });
+		readable.push(content);
+		readable.push(null);
+	} else {
+		throw Error("Either {file} or {content} are needed when calling env()!");
+	}
+
 	return new Promise(then => {
 		const gatheredValues: Map<string, string> = new Map();
 		const writable = new Writable({
@@ -188,6 +192,7 @@ export default function env(file: string): Promise<Map<string, string>> {
 			// thus we use any for now
 			write({ key, value }: any, _, next) {
 				gatheredValues.set(key, value);
+				next();
 			}
 		});
 
@@ -196,6 +201,6 @@ export default function env(file: string): Promise<Map<string, string>> {
 			then(gatheredValues);
 		});
 
-		createReadStream(file).pipe(new X3EnvParser).pipe(writable);
+		readable.pipe(new X3EnvParser).pipe(writable);
 	});
 }
