@@ -1,0 +1,8 @@
+/node_modules
+/.idea
+/data
+/test
+/coverage
+/.nyc_output
+/dist
+test.ts

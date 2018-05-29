@@ -1,0 +1,8 @@
+
+TEST=123
+TEST2=a$TEST
+TEST3="abc
+and TEST is $TEST and nl:
+"
+TEST4='I don\'t care about $TEST
+or newline'
