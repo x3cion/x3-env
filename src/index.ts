@@ -105,7 +105,7 @@ export class X3EnvParser extends Transform {
 			this.currentColumnCount++;
 
 			if (this.inComment) {
-				this.inComment = currentChar === "\n";
+				this.inComment = currentChar !== "\n";
 				continue;
 			}
 
