@@ -54,5 +54,11 @@ describe("Test env parsing", () => {
 		const content = "TEST1=true\nTEST2='test1 is $TEST1'";
 		const parsed = await env({content});
 		compareResults(parsed, new Map([["TEST1", "true"], ["TEST2", "test1 is $TEST1"]]));
-	})
+	});
+
+	it("should ignore comments", async () => {
+		const content = "#abc\nTEST=abc";
+		const parsed = await env({content});
+		compareResults(parsed, new Map([["TEST", "abc"]]));
+	});
 });

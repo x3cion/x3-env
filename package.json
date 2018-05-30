@@ -1,6 +1,6 @@
 {
   "name": "x3-env",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A env file reader written in Typescript.",
   "repository": {
     "type": "git",
@@ -10,7 +10,7 @@
   "main": "dist/index.js",
   "scripts": {
     "test": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"commonjs\\\"} nyc mocha -r ts-node/register -r source-map-support/register --recursive src/**/*.spec.ts",
-    "prepublishOnly": "rm -rf dist/ && tsc && npm run test",
+    "prepublishOnly": "del-cli -f dist/ && tsc && npm run test",
     "watch": "tsc -w"
   },
   "typings": "dist/index.d.ts",
@@ -26,7 +26,8 @@
     "source-map-support": "0.x",
     "ts-node": "6.x",
     "tslint": "5.x",
-    "typescript": "2.x"
+    "typescript": "2.x",
+    "del-cli": "1.x"
   },
   "nyc": {
     "extension": [
