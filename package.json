@@ -1,6 +1,6 @@
 {
   "name": "x3-env",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A env file reader written in Typescript.",
   "repository": {
     "type": "git",

@@ -6,7 +6,7 @@ import { EOL } from "os";
 export class X3EnvParser extends Transform {
 	static KEY_FIRST_CHAR_REGEX = /[a-zA-Z_]/;
 	static KEY_TAIL_CHAR_REGEX = /[\w]/;
-	static LINE_ENDING = new RegExp(`[^${EOL}]`);
+	static LINE_ENDING = new RegExp(`[${EOL}]`);
 	static SPACE = /\s/;
 	static QUOTE = /['"]/;
 	static STRING_VARIABLE = /\$([a-zA-Z_][\w]*)/g;
@@ -129,6 +129,8 @@ export class X3EnvParser extends Transform {
 					this.inComment = true;
 					this.pushEntry({ allowEmpty: true });
 					continue;
+				} else if (currentChar === ";" && !this.currentKey) {
+					continue;
 				} else if (this.isSpace(currentChar)) {
 					continue;
 				} else if (this.isKeyBeginning(currentChar) || this.currentKey && this.isKeyTail(currentChar)) {
@@ -141,7 +143,7 @@ export class X3EnvParser extends Transform {
 				if (currentChar === "\\") {
 					this.lastWasEscape = true;
 					continue;
-				} else if ((this.currentQuote && currentChar === this.currentQuote && !this.lastWasEscape) || (!this.currentQuote && !this.isLineEnding(currentChar))) {
+				} else if ((this.currentQuote && currentChar === this.currentQuote && !this.lastWasEscape) || (!this.currentQuote && (currentChar === ";" || this.isLineEnding(currentChar)))) {
 					this.inValue = false;
 					this.pushEntry();
 					continue;

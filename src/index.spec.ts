@@ -61,4 +61,10 @@ describe("Test env parsing", () => {
 		const parsed = await env({content});
 		compareResults(parsed, new Map([["TEST", "abc"]]));
 	});
+
+	it("should allow semicolons at the end", async () => {
+		const content = "TEST=abc2;TEST2=cba$TEST;\nTEST3='next line';TEST4=sameline;";
+		const parsed = await env({content});
+		compareResults(parsed, new Map([["TEST", "abc2"], ["TEST2", "cbaabc2"], ["TEST3", "next line"], ["TEST4", "sameline"]]));
+	})
 });
