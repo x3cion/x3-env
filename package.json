@@ -1,6 +1,6 @@
 {
   "name": "x3-env",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A env file reader written in Typescript.",
   "repository": {
     "type": "git",
@@ -22,7 +22,7 @@
     "chai": "4.x",
     "cross-env": "5.x",
     "mocha": "5.x",
-    "nyc": "11.x",
+    "nyc": "14.1.1",
     "source-map-support": "0.x",
     "ts-node": "6.x",
     "tslint": "5.x",
